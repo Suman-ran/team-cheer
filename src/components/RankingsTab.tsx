@@ -1,11 +1,17 @@
+import { useEffect } from 'react';
 import { useVoteStore } from '@/store/voteStore';
-import { Trophy, Medal, Award, TrendingUp } from 'lucide-react';
+import { Trophy, Medal, Award, TrendingUp, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function RankingsTab() {
-  const { getRankings, getTotalVotes } = useVoteStore();
+  const { getRankings, getTotalVotes, subscribeToVotes, loading } = useVoteStore();
   const rankings = getRankings();
   const totalVotes = getTotalVotes();
+  
+  useEffect(() => {
+    const unsubscribe = subscribeToVotes();
+    return () => unsubscribe();
+  }, [subscribeToVotes]);
   
   const maxVotes = rankings[0]?.voteCount || 1;
   
@@ -34,6 +40,15 @@ export function RankingsTab() {
         return "border-border bg-card";
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-muted-foreground mt-4">Loading rankings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">

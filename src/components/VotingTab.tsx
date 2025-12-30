@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { teams } from '@/data/teams';
 import { useVoteStore } from '@/store/voteStore';
 import { TeamCard } from './TeamCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Vote, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Vote, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 const MAX_SELECTIONS = 3;
 
@@ -13,8 +13,14 @@ export function VotingTab() {
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [voterName, setVoterName] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const { addVote, hasVoted, getTotalVotes } = useVoteStore();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { addVote, hasVoted, getTotalVotes, subscribeToVotes, loading } = useVoteStore();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const unsubscribe = subscribeToVotes();
+    return () => unsubscribe();
+  }, [subscribeToVotes]);
 
   const handleTeamToggle = (teamId: string) => {
     setSelectedTeams((prev) => {
@@ -33,7 +39,7 @@ export function VotingTab() {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!voterName.trim()) {
       toast({
         title: "Name required",
@@ -61,16 +67,43 @@ export function VotingTab() {
       return;
     }
 
-    const success = addVote(voterName, selectedTeams);
+    setIsSubmitting(true);
     
-    if (success) {
-      setHasSubmitted(true);
+    try {
+      const success = await addVote(voterName, selectedTeams);
+      
+      if (success) {
+        setHasSubmitted(true);
+        toast({
+          title: "Vote submitted!",
+          description: `Thank you ${voterName}! Your vote has been recorded.`,
+        });
+      } else {
+        toast({
+          title: "Already voted",
+          description: "You have already submitted a vote with this name.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Vote submitted!",
-        description: `Thank you ${voterName}! Your vote has been recorded.`,
+        title: "Error",
+        description: "Failed to submit vote. Please try again.",
+        variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-muted-foreground mt-4">Loading...</p>
+      </div>
+    );
+  }
 
   if (hasSubmitted) {
     return (
@@ -157,12 +190,16 @@ export function VotingTab() {
       <div className="flex flex-col items-center gap-4">
         <Button
           onClick={handleSubmit}
-          disabled={selectedTeams.length === 0 || !voterName.trim()}
+          disabled={selectedTeams.length === 0 || !voterName.trim() || isSubmitting}
           size="lg"
           className="gradient-primary text-primary-foreground font-semibold px-8 py-6 text-lg hover:opacity-90 transition-opacity disabled:opacity-50"
         >
-          <Vote className="w-5 h-5 mr-2" />
-          Submit Vote
+          {isSubmitting ? (
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+          ) : (
+            <Vote className="w-5 h-5 mr-2" />
+          )}
+          {isSubmitting ? 'Submitting...' : 'Submit Vote'}
         </Button>
         
         <p className="text-sm text-muted-foreground flex items-center gap-2">
